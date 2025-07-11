@@ -1,7 +1,7 @@
 import pandas as pd
 
 class Backtester:
-    def __init__(self, data: pd.DataFrame, signals: pd.DataFrame, capital: float = 100000):
+    def __init__(self, data: pd.DataFrame, signals: pd.DataFrame, capital: float = 10000):
         self.data = data.copy()
         self.signals = signals.copy()
         self.capital = capital
