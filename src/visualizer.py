@@ -1,8 +1,81 @@
+import mplfinance as mpf
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+from matplotlib.gridspec import GridSpec
 import pandas as pd
 
+# Settings
+vol_width = 0.0006
+
+# Apply dark theme
 plt.style.use('dark_background')
+background_color = '#121212'
+grid_color = '#333333'
+text_color = 'white'
+
+
+def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame):
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+
+    # Align results index with df index
+    results = results.copy()
+    results.index = pd.to_datetime(results.index)
+    results = results[results.index.isin(df.index)]
+
+    # ---- Add Buy/Sell markers at actual close prices ----
+    df['Buy_marker'] = float('nan')
+    df['Sell_marker'] = float('nan')
+
+    buy_signals = signals[signals['positions'] == 1.0]
+    sell_signals = signals[signals['positions'] == -1.0]
+
+    df.loc[buy_signals.index, 'Buy_marker'] = df.loc[buy_signals.index, 'close']
+    df.loc[sell_signals.index, 'Sell_marker'] = df.loc[sell_signals.index, 'close']
+
+    # ---- Set up full figure layout ----
+    fig = plt.figure(figsize=(14, 9))
+    gs = GridSpec(3, 1, height_ratios=[3, 1, 1], hspace=0.05)
+
+    ax_price = fig.add_subplot(gs[0])
+    ax_volume = fig.add_subplot(gs[1], sharex=ax_price)
+    ax_equity = fig.add_subplot(gs[2], sharex=ax_price)
+
+    # ---- Buy/Sell plots using custom axes ----
+    buy_plot = mpf.make_addplot(df['Buy_marker'], type='scatter', markersize=100,
+                                 marker='^', color='lime', ax=ax_price)
+    sell_plot = mpf.make_addplot(df['Sell_marker'], type='scatter', markersize=100,
+                                  marker='v', color='red', ax=ax_price)
+
+    # ---- Candlestick and Volume via mplfinance on custom axes ----
+    mpf.plot(df,
+             type='candle',
+             ax=ax_price,
+             volume=ax_volume,
+             addplot=[buy_plot, sell_plot],
+             style='nightclouds',
+             xrotation=15,
+             warn_too_much_data=len(df) + 1,
+             show_nontrading=True)
+
+    # ---- Plot Equity Curve ----
+    if 'equity_curve' in results.columns:
+        ax_equity.plot(results.index, results['equity_curve'], color='deepskyblue', label='Equity Curve')
+        ax_equity.set_facecolor('#121212')
+        ax_equity.tick_params(colors='white')
+        ax_equity.set_ylabel("Equity", color='white')
+        ax_equity.grid(True, color='#333333')
+        ax_equity.legend(loc='upper left', facecolor='#121212', edgecolor='#333333', labelcolor='white')
+    else:
+        ax_equity.text(0.5, 0.5, 'No Equity Curve Found', transform=ax_equity.transAxes,
+                       ha='center', va='center', fontsize=12, color='orange')
+        ax_equity.set_axis_off()
+
+    # ---- Final tweaks ----
+    plt.setp(ax_price.get_xticklabels(), visible=False)
+    plt.setp(ax_volume.get_xticklabels(), visible=False)
+    fig.suptitle("Backtest Viewer: Candlesticks, Volume, Equity", color='white')
+
+    plt.show()
 
 def show_metrics(data):
     # KPI benchmark ranges as strings (for display)
@@ -87,36 +160,6 @@ def show_metrics(data):
     # Show table
     print(df.to_string(index=False))
 
-def plot_trend(df: pd.DataFrame):
-    fig, ax1 = plt.subplots(figsize=(14, 6))
-
-    # Plot Price and Moving Averages
-    ax1.plot(df['close'], label='Price', alpha=0.5, color='blue')
-
-    plt.plot(df['open'], label='Open Price', alpha=0.5)
-    plt.plot(df['close'], label='Close Price', alpha=0.5)
-    plt.plot(df['high'], label='High Price',linestyle='--', alpha=0.5)
-    plt.plot(df['low'], label='Low Price',linestyle='--', alpha=0.5)
-
-    plt.title('Price Trend')
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True)
-
-    # Secondary Y-axis for Volume
-    ax2 = ax1.twinx()
-    ax2.bar(df.index, df['volume'], width=0.02, alpha=0.2, color='gray', label='Volume')
-    ax2.set_ylabel('Volume')
-
-    # Combine legends from both axes
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
-
-    plt.tight_layout()
-    plt.show()
-
 def plot_signals(df: pd.DataFrame, signals: pd.DataFrame):
     plt.figure(figsize=(14, 6))
     plt.plot(df['close'], label='Price', alpha=0.5)
@@ -131,64 +174,5 @@ def plot_signals(df: pd.DataFrame, signals: pd.DataFrame):
     plt.ylabel('Price')
     plt.legend()
     plt.grid(True)
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame):
-    # Convert datetime index to matplotlib's numeric format
-    df = df.copy()
-    df['date_num'] = mdates.date2num(df.index.to_pydatetime())
-
-    # Apply dark theme
-    background_color = '#121212'
-    grid_color = '#333333'
-    text_color = 'white'
-
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 9),
-                                        sharex=True,
-                                        gridspec_kw={'height_ratios': [3, 1, 1]},
-                                        facecolor=background_color)
-
-    # Apply dark theme settings to axes
-    for ax in (ax1, ax2, ax3):
-        ax.set_facecolor(background_color)
-        ax.tick_params(colors=text_color)
-        ax.yaxis.label.set_color(text_color)
-        ax.xaxis.label.set_color(text_color)
-        ax.grid(True, color=grid_color)
-
-    # ---- Price and Buy/Sell Signals (Top Plot) ----
-    ax1.plot(df.index, df['close'], label='Price', alpha=0.7, color='lime')
-
-    buy_signals = signals[signals['positions'] == 1.0]
-    sell_signals = signals[signals['positions'] == -1.0]
-    ax1.plot(buy_signals.index, df.loc[buy_signals.index, 'close'], '^', markersize=8, color='lightgreen', label='Buy')
-    ax1.plot(sell_signals.index, df.loc[sell_signals.index, 'close'], 'v', markersize=8, color='red', label='Sell')
-
-    ax1.set_title('Trading Signals and Price', color=text_color)
-    ax1.set_ylabel('Price')
-    ax1.legend(loc='upper left', facecolor=background_color, edgecolor=grid_color, labelcolor=text_color)
-
-    # ---- Volume Bars (Middle Plot) ----
-    ax2.bar(df['date_num'], df['volume'], width=0.0006, alpha=0.6, color='cyan', align='center')
-    ax2.set_ylabel('Volume')
-
-    # ---- Equity Curve (Bottom Plot) ----
-    if 'equity_curve' in results.columns:
-        ax3.plot(results.index, results['equity_curve'], label='Equity Curve', color='deepskyblue')
-        ax3.set_ylabel('Portfolio Value')
-        ax3.set_xlabel('Date')
-        ax3.legend(facecolor=background_color, edgecolor=grid_color, labelcolor=text_color)
-    else:
-        ax3.text(0.5, 0.5, 'No Equity Curve Found in DataFrame',
-                 transform=ax3.transAxes, ha='center', va='center',
-                 fontsize=12, color='orange')
-        ax3.set_axis_off()
-
-    # Format x-axis
-    ax3.xaxis_date()
-    fig.autofmt_xdate()
-
     plt.tight_layout()
     plt.show()

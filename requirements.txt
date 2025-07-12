@@ -4,4 +4,5 @@ yfinance
 matplotlib
 ccxt
 ta
-streamlit
+pyarrow
+mplfinance
