@@ -47,3 +47,12 @@ def load_data(filename: str) -> pd.DataFrame:
     df = pd.read_parquet('data/' + filename)
     print(f"Data loaded from data/{filename}")
     return df
+
+'''
+---------- Code for Data Generation and Example ----------
+asset = "BTC"
+# df = load_yfinance_data(asset, "2025-07-03", "2025-07-04", "1m")
+df = load_crypto_data(asset+"/USDT", timeframe="1m", limit=10000)
+
+save_data(df, asset)
+'''
