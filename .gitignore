@@ -1,0 +1,4 @@
+experiments/*.json
+venv/
+data/
+src/__pycache__/
