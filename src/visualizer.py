@@ -17,7 +17,6 @@ def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame)
     df = df.copy()
     df.index = pd.to_datetime(df.index)
 
-    # Align results index with df index
     results = results.copy()
     results.index = pd.to_datetime(results.index)
     results = results[results.index.isin(df.index)]
@@ -26,32 +25,44 @@ def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame)
     df['Buy_marker'] = float('nan')
     df['Sell_marker'] = float('nan')
 
-    buy_signals = signals[signals['positions'] == 1.0]
-    sell_signals = signals[signals['positions'] == -1.0]
+    buy_signals = signals[signals.get('positions', pd.Series()) == 1.0]
+    sell_signals = signals[signals.get('positions', pd.Series()) == -1.0]
 
     df.loc[buy_signals.index, 'Buy_marker'] = df.loc[buy_signals.index, 'close']
     df.loc[sell_signals.index, 'Sell_marker'] = df.loc[sell_signals.index, 'close']
 
-    # ---- Set up full figure layout ----
+    # ---- Set up figure layout ----
     fig = plt.figure(figsize=(14, 9))
-    gs = GridSpec(3, 1, height_ratios=[3, 1, 1], hspace=0.05)
+    gs = GridSpec(3, 1, height_ratios=[3, 1, 2], hspace=0.05)
 
     ax_price = fig.add_subplot(gs[0])
     ax_volume = fig.add_subplot(gs[1], sharex=ax_price)
     ax_equity = fig.add_subplot(gs[2], sharex=ax_price)
 
-    # ---- Buy/Sell plots using custom axes ----
+    # ---- Add Buy/Sell markers ----
     buy_plot = mpf.make_addplot(df['Buy_marker'], type='scatter', markersize=100,
                                  marker='^', color='lime', ax=ax_price)
     sell_plot = mpf.make_addplot(df['Sell_marker'], type='scatter', markersize=100,
                                   marker='v', color='red', ax=ax_price)
 
-    # ---- Candlestick and Volume via mplfinance on custom axes ----
+    # ---- Add TA signal bands if available ----
+    signal_plots = []
+    if 'low' in signals.columns:
+        signal_plots.append(mpf.make_addplot(signals['low'], color='green', linestyle='--', ax=ax_price))
+    if 'mid' in signals.columns:
+        signal_plots.append(mpf.make_addplot(signals['mid'], color='blue', linestyle='--', ax=ax_price))
+    if 'high' in signals.columns:
+        signal_plots.append(mpf.make_addplot(signals['high'], color='red', linestyle='--', ax=ax_price))
+
+    # ---- Combine all additional plots ----
+    add_plots = [buy_plot, sell_plot] + signal_plots
+
+    # ---- Plot Candlestick and Volume ----
     mpf.plot(df,
              type='candle',
              ax=ax_price,
              volume=ax_volume,
-             addplot=[buy_plot, sell_plot],
+             addplot=add_plots,
              style='nightclouds',
              xrotation=15,
              warn_too_much_data=len(df) + 1,
@@ -159,20 +170,3 @@ def show_metrics(data):
 
     # Show table
     print(df.to_string(index=False))
-
-def plot_signals(df: pd.DataFrame, signals: pd.DataFrame):
-    plt.figure(figsize=(14, 6))
-    plt.plot(df['close'], label='Price', alpha=0.5)
-    plt.plot(signals['short_ma'], label='Short MA', linestyle='--', color='green')
-    plt.plot(signals['long_ma'], label='Long MA', linestyle='--', color='red')
-    buy_signals = signals[signals['positions'] == 1.0]
-    sell_signals = signals[signals['positions'] == -1.0]
-    plt.plot(buy_signals.index, df.loc[buy_signals.index]['close'], '^', markersize=8, color='g', label='Buy')
-    plt.plot(sell_signals.index, df.loc[sell_signals.index]['close'], 'v', markersize=8, color='r', label='Sell')
-    plt.title('Trading Signals')
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
