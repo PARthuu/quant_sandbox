@@ -1,4 +1,8 @@
-experiments/*.json
+# Directories
 venv/
 data/
 src/__pycache__/
+
+# Files
+.DS_Store
+experiments/*.json
