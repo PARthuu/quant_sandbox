@@ -2,6 +2,8 @@ from ta.momentum import RSIIndicator
 from ta.volatility import BollingerBands
 import pandas as pd
 
+pd.set_option('display.max_rows', None)
+
 class Strategy:
     def __init__(self, data: pd.DataFrame):
         self.data = data
@@ -15,13 +17,13 @@ class SMACrossoverStrategy(Strategy):
         self.long_window = long_window
 
     def generate_signals(self):
-        self.signals['short_ma'] = self.data['close'].rolling(self.short_window).mean()
-        self.signals['long_ma'] = self.data['close'].rolling(self.long_window).mean()
+        self.signals['low'] = self.data['close'].rolling(self.short_window).mean()
+        self.signals['high'] = self.data['close'].rolling(self.long_window).mean()
         self.signals['signal'] = 0
         self.signals.loc[self.signals.index[self.short_window:], 'signal'] = (
-            self.signals['short_ma'].iloc[self.short_window:] > self.signals['long_ma'].iloc[self.short_window:]
-        ).astype(int)
-        self.signals['positions'] = self.signals['signal'].diff()
+            (self.signals['low'].iloc[self.short_window:] > self.signals['high'].iloc[self.short_window:]) * 2 - 1
+        )
+        self.signals['positions'] = self.signals['signal'].diff().clip(1, -1)
         return self.signals
     
 class EMACrossoverStrategy(Strategy):
@@ -31,10 +33,11 @@ class EMACrossoverStrategy(Strategy):
         self.long_window = long_window
 
     def generate_signals(self):
-        self.signals['short_ema'] = self.data['close'].ewm(span=self.short_window).mean()
-        self.signals['long_ema'] = self.data['close'].ewm(span=self.long_window).mean()
-        self.signals['signal'] = (self.signals['short_ema'] > self.signals['long_ema']).astype(int)
-        self.signals['positions'] = self.signals['signal'].diff()
+        self.signals['low'] = self.data['close'].ewm(span=self.short_window).mean()
+        self.signals['high'] = self.data['close'].ewm(span=self.long_window).mean()
+        self.signals['signal'] = -1
+        self.signals['signal'] = ((self.signals['low'] > self.signals['high']) * 2 - 1)
+        self.signals['positions'] = self.signals['signal'].diff().clip(1, -1)
         return self.signals
 
 class RSIStrategy(Strategy):
@@ -51,6 +54,9 @@ class RSIStrategy(Strategy):
         self.signals.loc[rsi < self.oversold, 'signal'] = 1
         self.signals.loc[rsi > self.overbought, 'signal'] = 0
         self.signals['positions'] = self.signals['signal'].diff()
+        self.signals['low'] = self.oversold
+        self.signals['high'] = self.overbought
+        # self.signals['mid'] = self.signals['rsi']
         return self.signals
 
 class BollingerBandStrategy(Strategy):
@@ -61,11 +67,11 @@ class BollingerBandStrategy(Strategy):
 
     def generate_signals(self):
         bb = BollingerBands(close=self.data['close'], window=self.window, window_dev=self.std_dev)
-        self.signals['bb_upper'] = bb.bollinger_hband()
-        self.signals['bb_lower'] = bb.bollinger_lband()
+        self.signals['high'] = bb.bollinger_hband()
+        self.signals['low'] = bb.bollinger_lband()
         self.signals['signal'] = 0
-        self.signals.loc[self.data['close'] < self.signals['bb_lower'], 'signal'] = 1
-        self.signals.loc[self.data['close'] > self.signals['bb_upper'], 'signal'] = 0
+        self.signals.loc[self.data['close'] > self.signals['high'], 'signal'] = 0
+        self.signals.loc[self.data['close'] < self.signals['low'], 'signal'] = 1
         self.signals['positions'] = self.signals['signal'].diff()
         return self.signals
 
@@ -81,4 +87,32 @@ class CombinedStrategy(Strategy):
         b = self.strat_b.generate_signals()['signal']
         self.signals['signal'] = ((a & b) if self.logic == 'AND' else (a | b)).astype(int)
         self.signals['positions'] = self.signals['signal'].diff()
+        return self.signals
+
+class SwingStrategy(Strategy):
+    def __init__(self, data, cooldown=1):
+        super().__init__(data)
+        self.cooldown = cooldown
+
+    def generate_signals(self):
+        self.signals['close'] = self.data['close']
+        
+        # Generate basic signal: 1 for up, -1 for down
+        self.signals['raw_signal'] = (self.signals['close'].diff() > 0).astype(int) * 2 - 1
+        
+        # Initialize signal column with zeros
+        self.signals['signal'] = 0
+        last_trade_index = -self.cooldown  # Initialize far in the past
+        
+        for i in range(1, len(self.signals)):
+            if (i - last_trade_index) >= self.cooldown:
+                self.signals.iloc[i, self.signals.columns.get_loc('signal')] = self.signals.iloc[i, self.signals.columns.get_loc('raw_signal')]
+                last_trade_index = i
+            else:
+                self.signals.iloc[i, self.signals.columns.get_loc('signal')] = self.signals.iloc[i - 1, self.signals.columns.get_loc('signal')]
+
+
+        # Calculate position changes (1 for new long, -1 for new short)
+        self.signals['positions'] = self.signals['signal'].diff().clip(lower=-1, upper=1)
+        
         return self.signals
