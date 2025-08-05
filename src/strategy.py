@@ -60,19 +60,31 @@ class RSIStrategy(Strategy):
         return self.signals
 
 class BollingerBandStrategy(Strategy):
-    def __init__(self, data, window=20, std_dev=2):
+    def __init__(self, data, window=20, std_dev=3):
         super().__init__(data)
         self.window = window
         self.std_dev = std_dev
+        self.buy = 0
 
     def generate_signals(self):
         bb = BollingerBands(close=self.data['close'], window=self.window, window_dev=self.std_dev)
+        self.signals['mid'] = bb.bollinger_mavg()
         self.signals['high'] = bb.bollinger_hband()
         self.signals['low'] = bb.bollinger_lband()
-        self.signals['signal'] = 0
-        self.signals.loc[self.data['close'] > self.signals['high'], 'signal'] = 0
-        self.signals.loc[self.data['close'] < self.signals['low'], 'signal'] = 1
-        self.signals['positions'] = self.signals['signal'].diff()
+
+        # Generate entry signals only on confirmation (re-entry into band)
+        for i in range(1, len(self.signals)):
+            # Buy when price was below lower band and comes back above it
+            if (self.buy == 0 or self.buy == -1) and self.data['close'].iloc[i-1] < self.signals['low'].iloc[i-1] and self.data['close'].iloc[i] > self.signals['low'].iloc[i]:
+                self.buy = 1
+
+            # Sell when price was above upper band and comes back below it
+            if (self.buy == 0 or self.buy == 1) and self.data['close'].iloc[i-1] > self.signals['high'].iloc[i-1] and self.data['close'].iloc[i] < self.signals['high'].iloc[i]:
+                self.buy = -1
+
+            self.signals.at[self.data.index[i], 'signal'] = self.buy
+
+        self.signals['positions'] = self.signals['signal'].diff().clip(lower=-1, upper=1)
         return self.signals
 
 class CombinedStrategy(Strategy):
