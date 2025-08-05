@@ -48,11 +48,11 @@ def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame)
     # ---- Add TA signal bands if available ----
     signal_plots = []
     if 'low' in signals.columns:
-        signal_plots.append(mpf.make_addplot(signals['low'], color='green', linestyle='--', ax=ax_price))
+        signal_plots.append(mpf.make_addplot(signals['low'], color='tomato', linestyle='--', ax=ax_price))
     if 'mid' in signals.columns:
-        signal_plots.append(mpf.make_addplot(signals['mid'], color='blue', linestyle='--', ax=ax_price))
+        signal_plots.append(mpf.make_addplot(signals['mid'], color='orange', linestyle='-', ax=ax_price))
     if 'high' in signals.columns:
-        signal_plots.append(mpf.make_addplot(signals['high'], color='red', linestyle='--', ax=ax_price))
+        signal_plots.append(mpf.make_addplot(signals['high'], color='lightgreen', linestyle='--', ax=ax_price))
 
     # ---- Combine all additional plots ----
     add_plots = [buy_plot, sell_plot] + signal_plots
