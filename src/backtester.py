@@ -10,7 +10,7 @@ class Backtester:
         df = self.data.copy()
         df['signal'] = self.signals['signal']
         df['positions'] = self.signals['positions']
-        df['daily_return'] = df['close'].pct_change().fillna(0)
-        df['strategy_return'] = df['signal'].shift(1).fillna(0) * df['daily_return']
+        df['return'] = df['close'].pct_change().fillna(0)
+        df['strategy_return'] = df['signal'].shift(1).fillna(0) * df['return']
         df['equity_curve'] = (1 + df['strategy_return']).cumprod() * self.capital
         return df
