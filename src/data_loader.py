@@ -73,11 +73,11 @@ def select_to_load_data(directory='data/') -> pd.DataFrame:
     return df
 
 
-'''
+""" 
 # ---------- Code for Data Generation and Example ----------
-asset = "DAI/USDT"
-# df = load_yfinance_data(asset, "2025-07-03", "2025-07-04", "1m")
-df = load_crypto_data(asset, timeframe="1m", limit=10000)
+asset = "RELIANCE.NS"
+df = load_yfinance_data(asset, "2025-08-19", "2025-08-20", "1m")
+# df = load_crypto_data(asset, timeframe="1m", limit=10000)
 
 save_data(df, asset)
-'''
+ """

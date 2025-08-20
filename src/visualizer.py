@@ -13,7 +13,10 @@ grid_color = '#333333'
 text_color = 'white'
 
 
-def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame):
+def plot_results(df: pd.DataFrame,
+                 signals: pd.DataFrame,
+                 results: pd.DataFrame,
+                 strategy_name: str):
     df = df.copy()
     df.index = pd.to_datetime(df.index)
 
@@ -84,7 +87,7 @@ def plot_results(df: pd.DataFrame, signals: pd.DataFrame, results: pd.DataFrame)
     # ---- Final tweaks ----
     plt.setp(ax_price.get_xticklabels(), visible=False)
     plt.setp(ax_volume.get_xticklabels(), visible=False)
-    fig.suptitle("Backtest Viewer: Candlesticks, Volume, Equity", color='white')
+    fig.suptitle("Backtest Viewer : " + strategy_name, color='white')
 
     plt.show()
 

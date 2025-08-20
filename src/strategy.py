@@ -4,12 +4,18 @@ import pandas as pd
 
 pd.set_option('display.max_rows', None)
 
+STRATEGY_REGISTRY = {}
+
+def register_strategy(cls):
+    STRATEGY_REGISTRY[cls.__name__] = cls
+    return cls
+
 class Strategy:
     def __init__(self, data: pd.DataFrame):
         self.data = data
         self.signals = pd.DataFrame(index=self.data.index)
 
-
+@register_strategy
 class SMACrossoverStrategy(Strategy):
     def __init__(self, data: pd.DataFrame, short_window: int = 20, long_window: int = 50):
         super().__init__(data)
@@ -25,7 +31,7 @@ class SMACrossoverStrategy(Strategy):
         )
         self.signals['positions'] = self.signals['signal'].diff().clip(1, -1)
         return self.signals
-    
+@register_strategy    
 class EMACrossoverStrategy(Strategy):
     def __init__(self, data, short_window=20, long_window=50):
         super().__init__(data)
@@ -39,7 +45,7 @@ class EMACrossoverStrategy(Strategy):
         self.signals['signal'] = ((self.signals['low'] > self.signals['high']) * 2 - 1)
         self.signals['positions'] = self.signals['signal'].diff().clip(1, -1)
         return self.signals
-
+@register_strategy
 class RSIStrategy(Strategy):
     def __init__(self, data, rsi_period=14, overbought=70, oversold=30):
         super().__init__(data)
@@ -58,7 +64,7 @@ class RSIStrategy(Strategy):
         self.signals['high'] = self.overbought
         # self.signals['mid'] = self.signals['rsi']
         return self.signals
-
+@register_strategy
 class BollingerBandStrategy(Strategy):
     def __init__(self, data, window=20, std_dev=3):
         super().__init__(data)
@@ -86,7 +92,7 @@ class BollingerBandStrategy(Strategy):
 
         self.signals['positions'] = self.signals['signal'].diff().clip(lower=-1, upper=1)
         return self.signals
-
+    
 class CombinedStrategy(Strategy):
     def __init__(self, data, strat_a, strat_b, logic='AND'):
         super().__init__(data)
@@ -100,7 +106,7 @@ class CombinedStrategy(Strategy):
         self.signals['signal'] = ((a & b) if self.logic == 'AND' else (a | b)).astype(int)
         self.signals['positions'] = self.signals['signal'].diff()
         return self.signals
-
+@register_strategy
 class SwingStrategy(Strategy):
     def __init__(self, data, cooldown=1):
         super().__init__(data)
